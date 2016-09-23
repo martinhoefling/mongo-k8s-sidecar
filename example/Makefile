@@ -7,7 +7,7 @@ CREATE_SERVICE=TRUE
 # -GoogleCloudPlatform
 # -FLOCKERAWS
 # -AWS (NOT YET SUPPORTED)
-ENV=GoogleCloudPlatform
+ENV=EmptyDir
 
 # Default volume size on creation
 DISK_SIZE=100GB
@@ -19,7 +19,7 @@ ZONE=us-central1-f
 CONTROL_DNS=<FLOCKER CONTROL DNS>
 INITIAL_NODE_ID=<A FLOCKER NODE ID TO SEED A VOLUME>
 VOLUME_PREFIX=<any name to prefix your volumes with>
-KUBECONFIG=clusters/<K8s Cluster Name>/kubeconfig
+#KUBECONFIG=clusters/<K8s Cluster Name>/kubeconfig
 
 
 count:
@@ -29,12 +29,20 @@ ifeq ($(ENV),FLOCKERAWS)
 	-flockerctl --control-service=$(CONTROL_DNS) create -m name=$(VOLUME_PREFIX)-$(NEW_REPLICA_NUM) -s $(DISK_SIZE) --node=$(INITIAL_NODE_ID)
 endif
 add-replica:
+ifeq ($(ENV),HostPath)
+	@echo 'Adding Replica'
+	-sed -e 's~<num>~$(NEW_REPLICA_NUM)~g' mongo-controller-hostpath-template.yaml | kubectl create -f -
+endif
+ifeq ($(ENV),EmptyDir)
+	@echo 'Adding Replica'
+	-sed -e 's~<num>~$(NEW_REPLICA_NUM)~g' mongo-controller-emptydir-template.yaml | kubectl create -f -
+endif
 ifeq ($(ENV),GoogleCloudPlatform)
 	@echo 'Creating Disk'
 	-gcloud compute disks create mongo-persistent-storage-node-$(NEW_REPLICA_NUM)-disk --size $(DISK_SIZE) --zone $(ZONE)
 
 	@echo 'Adding Replica'
-	-sed -e 's~<num>~$(NEW_REPLICA_NUM)~g' mongo-controller-template.yaml | kubectl create -f -
+	-sed -e 's~<num>~$(NEW_REPLICA_NUM)~g' mongo-controller-gce-template.yaml | kubectl create -f -
 endif
 ifeq ($(ENV),AWS)
 	@echo 'AWS not supported yet'
